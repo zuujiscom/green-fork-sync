@@ -212,6 +212,23 @@ class SyncTests(unittest.TestCase):
         result = self.sync(ignore_checks=["*FreeBSD*"], ignore_events=["schedule"])[0]
         self.assertTrue(result.startswith("moved 3 commits to c3"), result)
 
+    def test_ignored_workflow_takes_its_jobs_along(self):
+        # storytold's "SonarCloud" workflow names its jobs "sonarcloud / Tests 4/4"; one still running
+        self.gh.checks = {"c3": [run("build", suite=1), run("sonarcloud / Tests 4/4", status="in_progress", suite=2)]}
+        self.gh.workflow_runs = {"c3": [wf("CI", suite=1), wf("SonarCloud", status="in_progress", suite=2)]}
+        self.assertTrue(self.sync()[0].startswith("waiting"))
+        result = self.sync(ignore_checks=["*SonarCloud*"])[0]
+        self.assertTrue(result.startswith("moved 3 commits to c3"), result)
+
+    def test_ignore_checks_ignores_case(self):
+        self.gh.checks = {"c3": [run("build"), run("FreeBSD / x86", "cancelled")]}
+        self.assertTrue(self.sync(ignore_checks=["*freebsd*"])[0].startswith("moved 3 commits to c3"))
+
+    def test_ignored_workflow_does_not_hide_other_workflows_checks(self):
+        self.gh.checks = {"c3": [run("build", "failure", suite=1), run("sonar", suite=2)], "c2": [run("build")]}
+        self.gh.workflow_runs = {"c3": [wf("CI", "failure", suite=1), wf("SonarCloud", suite=2)]}
+        self.assertTrue(self.sync(ignore_checks=["SonarCloud"])[0].startswith("moved 2 commits to c2"))
+
     def test_workflow_held_up_only_by_ignored_job_does_not_block(self):
         # CI's FreeBSD job is ignored; it failed (or is still running) while the rest passed
         self.gh.checks = {"c3": [run("build"), run("freebsd / x86", "failure")],

@@ -132,7 +132,7 @@ remove the `dry-run` line; the schedule takes over from there.
 | `fork-branch` | same as `branch` | Branch in the fork to move. |
 | `min-age-minutes` | `10` | Skip upstream commits newer than this. |
 | `lookback` | `40` | How many recent upstream commits to consider (max 100). |
-| `ignore-checks` | | Check-run and workflow names to leave out of the decision, `*` wildcards allowed (for example a flaky job, or `Dependabot`). |
+| `ignore-checks` | | Check-run and workflow names to leave out of the decision, `*` wildcards allowed, case ignored (for example a flaky job, or `Dependabot`). A matched workflow takes all of its jobs with it, whatever they are called. |
 | `require-checks` | | Check-run names that must be present and green, same format. |
 | `ignore-events` | | Leave out check runs of workflows started by these events, for example `schedule`: a nightly job on the branch tip otherwise adds its runs to a commit that was already green on push. |
 | `docs-paths` | | File patterns whose changes need no CI, `*` wildcards allowed (for example `*.md`, `.coderabbit.yaml`). Commits without checks that only change such files are taken along on top of the green commit. |

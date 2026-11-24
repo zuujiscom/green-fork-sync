@@ -6,7 +6,8 @@ itself pointed at, not commits from merged PR branches) and pick the newest comm
   - is at least --min-age minutes old, so every workflow has had time to start,
   - has at least one check run or commit status,
   - has every check run finished as success, skipped or neutral (nothing failed,
-    cancelled, timed out or still running), ignoring names matched by --ignore-check,
+    cancelled, timed out or still running), ignoring names matched by --ignore-check
+    (case-insensitive; a matched workflow takes all its jobs with it),
     runs of workflows started by an --ignore-event (for example nightly `schedule` runs)
     and runs left by an older run of a workflow that has run again on the commit,
   - has every workflow run for it finished the same way, even one cancelled or queued before
@@ -56,8 +57,8 @@ class Syncer:
         """Return (is_green, reason) for an upstream commit."""
         up = self.c.upstream
 
-        def ignored(name):
-            return any(fnmatch.fnmatch(name, p) for p in self.c.ignore_checks)
+        def ignored(name):  # case-insensitive: a "SonarCloud" workflow names its jobs "sonarcloud / ..."
+            return any(fnmatch.fnmatchcase(name.lower(), p.lower()) for p in self.c.ignore_checks)
 
         def pages(path, key):  # either list can pass 100 on a big repo
             out, page = [], 1
@@ -75,6 +76,8 @@ class Syncer:
         # A nightly workflow on the branch tip adds its check runs to a commit that was
         # already green on push; leave runs from the ignored events out.
         skip = {w["check_suite_id"] for w in workflows if w["event"] in self.c.ignore_events}
+        # An ignored workflow's jobs are ignored too, whatever they are called.
+        skip |= {w["check_suite_id"] for w in workflows if ignored(w["name"])}
         runs = [c for c in runs if c.get("check_suite", {}).get("id") not in skip]
         latest = {}
         for w in workflows:
