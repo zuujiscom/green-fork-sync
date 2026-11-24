@@ -230,6 +230,38 @@ class SyncTests(unittest.TestCase):
                                         wf("CI", suite=2, run_id=11, event="workflow_dispatch")]}
         self.assertTrue(self.sync()[0].startswith("moved 3 commits to c3"))
 
+    def test_failed_checks_of_an_older_run_of_the_same_workflow_do_not_count(self):
+        # CI failed (flaky), then was dispatched again as a new run, which passed: two suites.
+        self.gh.checks = {"c3": [run("build", "failure", suite=1), run("build", suite=2)]}
+        self.gh.workflow_runs = {"c3": [wf("CI", "failure", suite=1, run_id=10),
+                                        wf("CI", suite=2, run_id=11, event="workflow_dispatch")]}
+        self.assertTrue(self.sync()[0].startswith("moved 3 commits to c3"))
+
+    def test_newer_run_failing_still_blocks(self):
+        self.gh.checks = {"c3": [run("build", suite=1), run("build", "failure", suite=2)],
+                          "c2": [run("build")]}
+        self.gh.workflow_runs = {"c3": [wf("CI", suite=1, run_id=10),
+                                        wf("CI", "failure", suite=2, run_id=11, event="workflow_dispatch")]}
+        self.assertTrue(self.sync()[0].startswith("moved 2 commits to c2"))
+
+    def test_other_workflows_and_apps_still_count(self):
+        # A newer CI run replaces only CI's older checks, not Lint's or a non-Actions app's.
+        self.gh.checks = {"c3": [run("build", "failure", suite=1), run("build", suite=2),
+                                 run("lint", "failure", suite=3), run("sonar", "failure", suite=9)],
+                          "c2": [run("build")]}
+        self.gh.workflow_runs = {"c3": [wf("CI", "failure", suite=1, run_id=10), wf("CI", suite=2, run_id=11),
+                                        wf("Lint", "failure", suite=3, run_id=12)]}
+        result = self.sync()[0]
+        self.assertTrue(result.startswith("moved 2 commits to c2"), result)
+
+    def test_older_run_from_an_ignored_event_is_left_to_ignore_events(self):
+        # The newest push run is green; the scheduled run's checks are dropped by ignore-events only.
+        self.gh.checks = {"c3": [run("build", suite=1), run("build", "failure", suite=2)], "c2": [run("build")]}
+        self.gh.workflow_runs = {"c3": [wf("CI", suite=1, run_id=10), wf("CI", "failure", suite=2, run_id=11, event="schedule")]}
+        self.assertTrue(self.sync(ignore_events=["schedule"])[0].startswith("moved 3 commits to c3"))
+        self.gh.fork_sha = "c0"
+        self.assertTrue(self.sync()[0].startswith("moved 2 commits to c2"))  # without it the newer failure counts
+
     def test_workflow_runs_are_paginated(self):
         self.gh.checks = {"c3": [run("build")]}
         self.gh.workflow_runs = {"c3": [wf(f"w{i}", suite=i + 1) for i in range(100)] + [wf("late", "failure", suite=200)]}

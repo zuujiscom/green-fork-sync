@@ -24,8 +24,10 @@ first commit that:
 2. is at least `min-age-minutes` old (default 10), so every workflow has had time to start,
 3. has at least one check run or commit status,
 4. has every check run finished as **success**, **skipped** or **neutral**, with nothing
-   failed, cancelled, timed out or still running (names in `ignore-checks`, and runs of
-   workflows started by an event in `ignore-events`, are left out),
+   failed, cancelled, timed out or still running (names in `ignore-checks`, runs of
+   workflows started by an event in `ignore-events`, and the check runs of an older run of
+   a workflow that ran again on the same commit, say dispatched by hand after a flaky
+   failure, are left out),
 5. has every GitHub Actions workflow run for it finished the same way. This catches a
    workflow that was cancelled, or is still queued, before any of its jobs reported a check
    run, which would otherwise leave only the other workflows' passing checks to look at.
