@@ -6,8 +6,9 @@ itself pointed at, not commits from merged PR branches) and pick the newest comm
   - is at least --min-age minutes old, so every workflow has had time to start,
   - has at least one check run or commit status,
   - has every check run finished as success, skipped or neutral (nothing failed,
-    cancelled, timed out or still running), ignoring names matched by --ignore-check and
-    runs of workflows started by an --ignore-event (for example nightly `schedule` runs),
+    cancelled, timed out or still running), ignoring names matched by --ignore-check,
+    runs of workflows started by an --ignore-event (for example nightly `schedule` runs)
+    and runs left by an older run of a workflow that has run again on the commit,
   - has every workflow run for it finished the same way, even one cancelled or queued before
     any job reported (same exceptions; --ignore-check also matches workflow names),
   - has a combined commit status of success, if it has any statuses.
@@ -80,6 +81,14 @@ class Syncer:
             if w["event"] not in self.c.ignore_events and not ignored(w["name"]):
                 if w["workflow_id"] not in latest or w["id"] > latest[w["workflow_id"]]["id"]:
                     latest[w["workflow_id"]] = w
+        # Each new run of a workflow on the same commit (dispatched again, or a later trigger)
+        # gets its own check suite; filter=latest only collapses re-runs within one suite. An
+        # older run's failed check runs no longer count once a newer run of that workflow exists.
+        newest = {w["check_suite_id"] for w in latest.values()}
+        old = {w["check_suite_id"] for w in workflows if w["workflow_id"] in latest
+               and w["event"] not in self.c.ignore_events and w["check_suite_id"] not in newest}
+        runs = [c for c in runs if c.get("check_suite", {}).get("id") not in old]
+        every = [c for c in every if c.get("check_suite", {}).get("id") not in old]
         wf_running, wf_bad = [], []
         for w in latest.values():
             name = w["name"] if len(w["name"]) <= 40 else w["name"][:39] + "…"  # Dependabot's are long
