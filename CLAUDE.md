@@ -44,7 +44,8 @@ models commits with parents, check runs, workflow runs, commit statuses, compare
 `MetadataTests` fail if `action.yml`, the `SYNC_*` variables in `sync.py` and the README
 inputs table drift apart, so update all three together.
 
-`.github/workflows/ci.yml` runs the tests on Python 3.9, 3.12 and the latest 3.x for every
+`.github/workflows/ci.yml` runs the tests on Python 3.9 (on ubuntu-24.04, the newest image that still has it), 3.12
+and the latest 3.x for every
 push and PR (and weekly), then runs the action itself as a read-only dry run against real
 public repos. To try the real API by hand (needs `gh auth login`; reads only):
 
